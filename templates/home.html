@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banking Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-100 text-gray-800">
+
+    <nav class="bg-white shadow-md p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-700">MyBank</h1>
+        <form action="{{ url_for('auth.logout') }}" method="POST">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">Logout</button>
+
+        </form>
+    </nav>
+
+    <main class="max-w-4xl mx-auto mt-10 p-4">
+        <h2 class="text-2xl font-semibold mb-2">Welcome back, {{ username }}!</h2>
+
+        <div class="bg-white shadow-md rounded-xl p-6 mb-8">
+            <p class="text-gray-500 text-sm mb-1">Current Balance</p>
+            <p class="text-3xl font-bold text-green-600">${{ balance }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <a href="{{ url_for('banking.transfer') }}"
+                class="bg-white p-6 shadow rounded-xl text-center hover:bg-blue-50 transition">
+                <span class="block text-lg font-semibold text-blue-700 mb-2">Transfer</span>
+                <span class="text-sm text-gray-500">Send money easily</span>
+            </a>
+            <a href="{{ url_for('banking.transactions') }}"
+                class="bg-white p-6 shadow rounded-xl text-center hover:bg-blue-50 transition">
+                <span class="block text-lg font-semibold text-blue-700 mb-2">Transactions</span>
+                <span class="text-sm text-gray-500">View recent activity</span>
+            </a>
+            <a href="{{ url_for('banking.bills') }}"
+                class="bg-white p-6 shadow rounded-xl text-center hover:bg-blue-50 transition">
+                <span class="block text-lg font-semibold text-blue-700 mb-2">Pay Bills</span>
+                <span class="text-sm text-gray-500">Electricity, water, etc.</span>
+            </a>
+            <a href="{{ url_for('banking.accounts') }}"
+                class="bg-white p-6 shadow rounded-xl text-center hover:bg-blue-50 transition">
+                <span class="block text-lg font-semibold text-blue-700 mb-2">My Accounts</span>
+                <span class="text-sm text-gray-500">Manage linked accounts</span>
+            </a>
+            <a href="{{ url_for('banking.settings') }}"
+                class="bg-white p-6 shadow rounded-xl text-center hover:bg-blue-50 transition">
+                <span class="block text-lg font-semibold text-blue-700 mb-2">Settings</span>
+                <span class="text-sm text-gray-500">Update profile</span>
+            </a>
+        </div>
+    </main>
+
+</body>
+
+</html>
