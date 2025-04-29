@@ -2,8 +2,12 @@ from flask import (request, Blueprint, redirect, render_template, url_for, sessi
 from utils.storage import Storage
 import utils.logger as logger
 from utils.authmanager import AuthenticationManager
-import uuid
+import uuid, os
+from datetime import datetime
+from dotenv import load_dotenv
 
+load_dotenv()
+KEY = os.getenv("ENCREPTION_KEY")
 auth = Blueprint('auth', __name__)
 
 @auth.route('/register', methods=['GET', 'POST'])
@@ -25,19 +29,51 @@ def register():
     # Create new user
     password_hash = AuthenticationManager.hash_pass(password=form.get("password"))
     user_data = Storage.load_data(username)
-    
+    now = datetime.now()
+    formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    name = form.get("name")
+    email = form.get("email")
+    phone_number = form.get("phone number")
+    address = form.get("address")
+    date_of_birth = form.get("date of birth")
+
     new_data = {
-        "user_id": str(uuid.uuid4()),
-        "username": username,
-        "name": form.get("name"),
-        "email": form.get("email"),
-        "password_hash": password_hash,
-        "balance": 0,
-        "transactions": user_data.get("transactions", [])
-    }
+    "user_id": str(uuid.uuid4()),
+    "username": username,
+    "name": AuthenticationManager.encrypt_data(name, key=KEY),
+    "email": AuthenticationManager.encrypt_data(email, key=KEY),
+    "is_admin": False,
+    "password_hash": password_hash,  
+    "balance": 0,
+    "account_number": str(uuid.uuid4().int)[:10],
+    "phone_number": AuthenticationManager.encrypt_data(phone_number, key=KEY),
+    "address": AuthenticationManager.encrypt_data(address, key=KEY),
+    "date_created": formatted_date,
+    "date_of_birth": AuthenticationManager.encrypt_data(date_of_birth, key=KEY),
+    "transactions": user_data.get("transactions", []),
+    "token": None,
+}
+    # old data structure for reference and debugging befor encryption
+    # new_data = {
+    #     "user_id": str(uuid.uuid4()),
+    #     "username": username,
+    #     "name": form.get("name"),
+    #     "email": form.get("email"),
+    #     "is_admin": False,
+    #     "password_hash": password_hash,
+    #     "balance": 0,
+    #     "account_number": str(uuid.uuid4().int)[:10],
+    #     "phone_number": form.get("phone number"),
+    #     "address": form.get("address"),
+    #     "date_created": formatted_date,
+    #     "date_of_birth": form.get("date of birth"),
+    #     "transactions": user_data.get("transactions", []),
+    #     "token": None,
+    # }
     
     Storage.save_data(new_data, username)
-    logger.Info_logger.info(f"User {username} has registered successfully")
+    logger.Info_logger.info(f"User {username} has registered successfully at {formatted_date}")
     return redirect(url_for("auth.login"))
 
 @auth.route('/login', methods=['GET', 'POST'])

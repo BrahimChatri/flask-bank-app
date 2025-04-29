@@ -4,6 +4,7 @@ from views.auth import auth
 from dotenv import load_dotenv
 import os
 from datetime import timedelta
+from api.api import api
 
 
 load_dotenv()
@@ -11,7 +12,8 @@ load_dotenv()
 app = Flask(__name__)
 app.register_blueprint(banking, url_prefix='/')
 app.register_blueprint(auth, url_prefix='/')
-KEY = os.getenv("KEY")
+app.register_blueprint(api, url_prefix='/api')
+KEY = os.getenv("SECRET_KEY")
 
 app.config['SECRET_KEY'] = KEY
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  

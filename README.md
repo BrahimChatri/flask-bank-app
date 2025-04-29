@@ -23,6 +23,10 @@ The goal of this project is to learn and implement core backend concepts like au
 ```
 bank_app/
 │
+├── api/                    # api folder to have api routes
+|   ├── __init__.py
+|   ├── api.py              # views for api routes
+|
 ├── views/                  # Blueprint routes (e.g., banking, auth)
 │   ├── __init__.py         # Register blueprints
 │   ├── auth.py             # Auth-related routes
