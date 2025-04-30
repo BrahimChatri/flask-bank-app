@@ -3,7 +3,10 @@ from utils.storage import Storage
 import utils.logger as logger
 from utils.authmanager import AuthenticationManager
 import uuid
+from dotenv import load_dotenv
+import os
 
+KEY = os.getenv("ENCREPTION_KEY")
 api = Blueprint('api', __name__)
 
 
@@ -18,7 +21,7 @@ def login():
         session['user'] = username
         user_data = Storage.load_data(username)
         token = str(uuid.uuid4())
-        user_data['token'] = token
+        user_data['token'] = AuthenticationManager.encrypt_data(token, key=KEY)
         Storage.save_data(user_data, username)
         return jsonify(
             {"message": "Login successful",

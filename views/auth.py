@@ -10,6 +10,14 @@ load_dotenv()
 KEY = os.getenv("ENCREPTION_KEY")
 auth = Blueprint('auth', __name__)
 
+# This function is used to decrypt user data before displaying it to the user.
+def decrypt_user_data(data: dict) -> dict:
+    decrypted = data.copy()
+    for field in ["name", "email", "phone_number", "address", "date_of_birth"]:
+        decrypted[field] = AuthenticationManager.decrypt_data(data[field], key=KEY)
+    return decrypted
+
+
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
     if session.get("user_id"):
@@ -21,39 +29,40 @@ def register():
     # POST method handling
     form = request.form
     username = form.get("username")
+    password = form.get("password")
     
     if Storage.user_exists(username):
         logger.Error_logger.error(f"Registration failed: Username {username} already exists.")
         return render_template("register.html", error="Username already exists, please choose another")
 
     # Create new user
-    password_hash = AuthenticationManager.hash_pass(password=form.get("password"))
+    if not username or not password:
+        logger.Error_logger.error(f"Registration failed: Username or password cannot be empty.")
+        return render_template("register.html", error="Username and password cannot be empty")
+    password_hash = AuthenticationManager.hash_pass(password=password)
     user_data = Storage.load_data(username)
     now = datetime.now()
     formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    name = form.get("name")
-    email = form.get("email")
-    phone_number = form.get("phone number")
-    address = form.get("address")
-    date_of_birth = form.get("date of birth")
 
+    # Encrypting sensitive data before saving
     new_data = {
-    "user_id": str(uuid.uuid4()),
-    "username": username,
-    "name": AuthenticationManager.encrypt_data(name, key=KEY),
-    "email": AuthenticationManager.encrypt_data(email, key=KEY),
-    "is_admin": False,
-    "password_hash": password_hash,  
-    "balance": 0,
-    "account_number": str(uuid.uuid4().int)[:10],
-    "phone_number": AuthenticationManager.encrypt_data(phone_number, key=KEY),
-    "address": AuthenticationManager.encrypt_data(address, key=KEY),
-    "date_created": formatted_date,
-    "date_of_birth": AuthenticationManager.encrypt_data(date_of_birth, key=KEY),
-    "transactions": user_data.get("transactions", []),
-    "token": None,
-}
+        "user_id": str(uuid.uuid4()),
+        "username": username,
+        "name": AuthenticationManager.encrypt_data(form.get("name"), key=KEY),
+        "email": AuthenticationManager.encrypt_data(form.get("email"), key=KEY),
+        "is_admin": False,
+        "password_hash": password_hash,  # Make sure this is already hashed (e.g., bcrypt)
+        "balance": 0,
+        "account_number": str(uuid.uuid4().int)[:10],
+        "phone_number": AuthenticationManager.encrypt_data(form.get("phone_number"), key=KEY),
+        "address": AuthenticationManager.encrypt_data(form.get("address"), key=KEY),
+        "date_created": formatted_date,
+        "date_of_birth": AuthenticationManager.encrypt_data(form.get("date_of_birth"), key=KEY),
+        "transactions": user_data.get("transactions", []),
+        "token": None,
+    }
+
     # old data structure for reference and debugging befor encryption
     # new_data = {
     #     "user_id": str(uuid.uuid4()),
@@ -64,10 +73,10 @@ def register():
     #     "password_hash": password_hash,
     #     "balance": 0,
     #     "account_number": str(uuid.uuid4().int)[:10],
-    #     "phone_number": form.get("phone number"),
+    #     "phone_number": form.get("phone_number"),
     #     "address": form.get("address"),
     #     "date_created": formatted_date,
-    #     "date_of_birth": form.get("date of birth"),
+    #     "date_of_birth": form.get("date_of_birth"),
     #     "transactions": user_data.get("transactions", []),
     #     "token": None,
     # }
@@ -125,7 +134,8 @@ def forgot_password():
         return render_template("forgot_password.html", error="Username not found.")
 
     user_data = Storage.load_data(username)
-    if user_data.get("email") != email:
+    decripted =decrypt_user_data(user_data)
+    if decripted.get("email") != email:
         return render_template("forgot_password.html", error="Email does not match our records.")
 
     # Store reset session and show reset form
