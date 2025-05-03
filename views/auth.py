@@ -1,7 +1,7 @@
 from flask import (request, Blueprint, redirect, render_template, url_for, session)
-from utils.storage import Storage
+from utils.storage import load_data, save_data
 import utils.logger as logger
-from utils.authmanager import AuthenticationManager
+from utils.authmanager import *
 import uuid, os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -9,13 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 KEY = os.getenv("ENCREPTION_KEY")
 auth = Blueprint('auth', __name__)
-
-# This function is used to decrypt user data before displaying it to the user.
-def decrypt_user_data(data: dict) -> dict:
-    decrypted = data.copy()
-    for field in ["name", "email", "phone_number", "address", "date_of_birth"]:
-        decrypted[field] = AuthenticationManager.decrypt_data(data[field], key=KEY)
-    return decrypted
 
 
 @auth.route('/register', methods=['GET', 'POST'])
@@ -31,7 +24,7 @@ def register():
     username = form.get("username")
     password = form.get("password")
     
-    if Storage.user_exists(username):
+    if user_exists(username):
         logger.Error_logger.error(f"Registration failed: Username {username} already exists.")
         return render_template("register.html", error="Username already exists, please choose another")
 
@@ -39,8 +32,8 @@ def register():
     if not username or not password:
         logger.Error_logger.error(f"Registration failed: Username or password cannot be empty.")
         return render_template("register.html", error="Username and password cannot be empty")
-    password_hash = AuthenticationManager.hash_pass(password=password)
-    user_data = Storage.load_data(username)
+    password_hash = hash_pass(password=password)
+    user_data = load_data(username)
     now = datetime.now()
     formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -49,16 +42,16 @@ def register():
     new_data = {
         "user_id": str(uuid.uuid4()),
         "username": username,
-        "name": AuthenticationManager.encrypt_data(form.get("name"), key=KEY),
-        "email": AuthenticationManager.encrypt_data(form.get("email"), key=KEY),
+        "name": encrypt_data(form.get("name"), key=KEY),
+        "email": encrypt_data(form.get("email"), key=KEY),
         "is_admin": False,
         "password_hash": password_hash,  # Make sure this is already hashed (e.g., bcrypt)
         "balance": 0,
         "account_number": str(uuid.uuid4().int)[:10],
-        "phone_number": AuthenticationManager.encrypt_data(form.get("phone_number"), key=KEY),
-        "address": AuthenticationManager.encrypt_data(form.get("address"), key=KEY),
+        "phone_number": encrypt_data(form.get("phone_number"), key=KEY),
+        "address": encrypt_data(form.get("address"), key=KEY),
         "date_created": formatted_date,
-        "date_of_birth": AuthenticationManager.encrypt_data(form.get("date_of_birth"), key=KEY),
+        "date_of_birth": encrypt_data(form.get("date_of_birth"), key=KEY),
         "transactions": user_data.get("transactions", []),
         "token": None,
     }
@@ -81,7 +74,7 @@ def register():
     #     "token": None,
     # }
     
-    Storage.save_data(new_data, username)
+    save_data(new_data, username)
     logger.Info_logger.info(f"User {username} has registered successfully at {formatted_date}")
     return redirect(url_for("auth.login"))
 
@@ -97,11 +90,11 @@ def login():
     username = request.form.get("username")
     password = request.form.get("password")
     
-    if not Storage.user_exists(username):
+    if not user_exists(username):
         return render_template("login.html", error="Username does not exist")
         
-    data = Storage.load_data(username)
-    if not AuthenticationManager.compare_pass(password, data["password_hash"]):
+    data = load_data(username)
+    if not compare_pass(password, data["password_hash"]):
         logger.Info_logger.warning(f"Failed login attempt for user: {username}")
         return render_template("login.html", error="Invalid password, try again")
     
@@ -130,11 +123,11 @@ def forgot_password():
     username = request.form.get("username")
     email = request.form.get("email")
 
-    if not Storage.user_exists(username):
+    if not user_exists(username):
         return render_template("forgot_password.html", error="Username not found.")
 
-    user_data = Storage.load_data(username)
-    decripted =decrypt_user_data(user_data)
+    user_data = load_data(username)
+    decripted =decrypt_user_data(user_data, KEY)
     if decripted.get("email") != email:
         return render_template("forgot_password.html", error="Email does not match our records.")
 
@@ -145,16 +138,16 @@ def forgot_password():
 @auth.route("/reset_password", methods=["POST"])
 def reset_password():
     username = session.get("reset_username")
-    if not username or not Storage.user_exists(username):
+    if not username or not user_exists(username):
         return redirect(url_for("auth.forgot_password"))
 
     new_password = request.form.get("new_password")
     if not new_password:
         return render_template("forgot_password.html", error="Password cannot be empty.", show_reset=True, success="Verified! You can now reset your password.")
 
-    user_data = Storage.load_data(username)
-    user_data["password_hash"] = AuthenticationManager.hash_pass(new_password)
-    Storage.save_data(user_data, username)
+    user_data = load_data(username)
+    user_data["password_hash"] = hash_pass(new_password)
+    save_data(user_data, username)
 
     logger.Info_logger.info(f"Password reset for user: {username}")
     session.pop("reset_username", None)

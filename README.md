@@ -67,11 +67,6 @@ bank_app/
 - Flask
 - Any other standard libraries (like `uuid`, `hashlib`, `json`)
 
-Install dependencies:
-```bash
-pip install flask
-```
-
 ---
 
 ## 🏃‍♂️ Running the App

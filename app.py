@@ -5,16 +5,17 @@ from dotenv import load_dotenv
 import os
 from datetime import timedelta
 from api.api import api
-
+from flask_jwt_extended import JWTManager
 
 load_dotenv()
 
 app = Flask(__name__)
+jwt = JWTManager(app)
 app.register_blueprint(banking, url_prefix='/')
 app.register_blueprint(auth, url_prefix='/')
 app.register_blueprint(api, url_prefix='/api')
 KEY = os.getenv("SECRET_KEY")
-
+app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY") 
 app.config['SECRET_KEY'] = KEY
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  
 

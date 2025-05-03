@@ -1,16 +1,17 @@
 from flask import (request, Blueprint, redirect, render_template, url_for, 
-                  session)
-from utils.storage import Storage
+                  session, jsonify)
+from utils.storage import load_data, save_data
 import utils.logger as logger
 import uuid, os
-from utils.authmanager import AuthenticationManager
+from utils.authmanager import *
 from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import Any
 
-
+load_dotenv()
 banking = Blueprint('banking', __name__)
-
+KEY = os.getenv("ENCREPTION_KEY")
 # Function to check if user is logged in
 def login_required(f):
     @wraps(f)
@@ -29,22 +30,24 @@ def index():
     return render_template("index.html")
 
 # home page for loged in users that will show data 
-@banking.route('/home')
+@banking.route('/dashboard', methods=['GET'])
 @login_required
 def home():
-    user_data = Storage.load_data(session["username"])
+    user_data = load_data(session["username"])
     name = user_data.get("name")
     balance = user_data.get("balance")
     transactions = user_data.get("transactions", [])
     return render_template("home.html", balance=balance, transactions=transactions, username=session["username"], name=name)
 
-@banking.route('/transactions', methods=['GET', 'POST'])
+@banking.route('/history', methods=['GET', 'POST'])
 @login_required 
 def transactions():
-    user_data = Storage.load_data(session["username"])
+    enc_data: dict[str, Any] = load_data(session["username"])
+    user_data: dict = decrypt_user_data(enc_data, key=KEY)
     transactions = user_data.get("transactions", [])
     if not transactions :
-        return render_template("transactions.html", transactions=transactions, message="No transactions found")
+        return render_template("history.html", transactions=transactions, message="No transactions found")
+    return render_template("history.html", transactions=transactions, username=session["username"], name=user_data["name"])
     
 
 @banking.route("/transfer", methods=["POST"])
@@ -57,15 +60,15 @@ def transfer():
     try:
         amount = float(request.form.get("amount", 0))
     except ValueError:
-        return render_template("home.html", error="Invalid amount entered.", show_modal=True, username=session["username"], balance=Storage.load_data(session["username"])["balance"])
+        return render_template("home.html", error="Invalid amount entered.", show_modal=True, username=session["username"], balance=load_data(session["username"])["balance"])
 
     sender_username = session["username"]
 
-    if not Storage.user_exists(recipient):
-        return render_template("home.html", error="Recipient does not exist.", show_modal=True, username=sender_username, balance=Storage.load_data(sender_username)["balance"])
+    if not user_exists(recipient):
+        return render_template("home.html", error="Recipient does not exist.", show_modal=True, username=sender_username, balance=load_data(sender_username)["balance"])
 
-    sender_data = Storage.load_data(sender_username)
-    recipient_data = Storage.load_data(recipient)
+    sender_data = load_data(sender_username)
+    recipient_data = load_data(recipient)
 
     if sender_data["balance"] < amount:
         return render_template("home.html", error="Insufficient funds.", show_modal=True, username=sender_username, balance=sender_data["balance"])
@@ -96,16 +99,19 @@ def transfer():
     })
 
     # Save changes
-    Storage.save_data(sender_data, sender_username)
-    Storage.save_data(recipient_data, recipient)
+    save_data(sender_data, sender_username)
+    save_data(recipient_data, recipient)
 
     logger.Info_logger.info(f"{sender_username} transferred {amount} to {recipient} at {now}")
     return render_template("home.html", success="Transfer completed successfully.", show_modal=True, username=sender_username, balance=sender_data["balance"])
 
-@banking.route('/bills', methods=['GET', 'POST'])
+@banking.route('/pay_bills', methods=['GET', 'POST'])
 @login_required 
 def bills():
-    return "bills page"
+    bills_category = ["Electricity", "Water", "Internet", "Gas", "Phone", "Insurance", "Rent", "Other"]
+    if request.method == 'POST':
+        pass
+    return jsonify(bills_category)
 
 @banking.route('/settings', methods=['GET', 'POST'])
 @login_required 
