@@ -4,12 +4,12 @@ from cryptography.fernet import Fernet, InvalidToken
 import base64
 import hashlib, os
 
-min_: int = 2
+min_: int = 8
 
 # This function is used to decrypt user data before displaying it to the user.
 def decrypt_user_data(data: dict, key: str) -> dict:
     decrypted = data.copy()
-    for field in ["name", "email", "phone_number", "address", "date_of_birth"]:
+    for field in ["first_name","last_name", "email", "phone_number", "address", "date_of_birth"]:
         decrypted[field] = decrypt_data(data[field], key=key)
     return decrypted
 

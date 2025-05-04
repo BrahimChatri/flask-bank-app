@@ -21,32 +21,34 @@ The goal of this project is to learn and implement core backend concepts like au
 ## 📁 Project Structure
 
 ```
-bank_app/
-│
-├── api/                    # api folder to have api routes
-|   ├── __init__.py
-|   ├── api.py              # views for api routes
-|
-├── views/                  # Blueprint routes (e.g., banking, auth)
-│   ├── __init__.py         # Register blueprints
-│   ├── auth.py             # Auth-related routes
-│   └── banking.py          # Banking operations
-│
-├── templates/              # HTML templates
-│   ├── layout.html         # Base template
-│   ├── login.html
-│   ├── register.html
-│   ├── dashboard.html
-│   ├── transfer.html
-│   └── history.html
-│
-├── utils/                  # Helper modules
-│   ├── storage.py          # File-based read/write logic
-│   └── auth.py             # Password hashing & verification
-│
-├── static/                 # CSS, JS, images (if needed)
-├── app.py                  # Main entry point to run the Flask app
-└── README.md               # This file
+|-- bank_app
+    |-- .env
+    |-- .gitignore
+    |-- app.py
+    |-- config.py
+    |-- LICENSE
+    |-- logs.log
+    |-- README.md
+    |-- requirements.txt
+    |-- test.py
+    |-- data
+    |   |-- admin.json
+    |   |-- brahim_ch.json
+    |   |-- hafsa.json
+    |   |-- testuser.json
+    |
+    |-- utils
+    |   |-- authmanager.py
+    |   |-- logger.py
+    |   |-- storage.py
+    |   |-- __init__.py
+    |
+    |-- views
+    |   |-- admin.py
+    |   |-- auth.py
+    |   |-- banking.py
+    |   |-- __init__.py
+    
 ```
 
 ---

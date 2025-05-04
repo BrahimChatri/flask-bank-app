@@ -1,8 +1,8 @@
-from flask import (request, Blueprint, redirect, render_template, url_for, 
-                  session, jsonify)
+from flask import (request, Blueprint, redirect, render_template, url_for, jsonify)
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from utils.storage import load_data, save_data
 import utils.logger as logger
-import uuid, os
+import json, os, uuid
 from utils.authmanager import *
 from functools import wraps
 from datetime import datetime
@@ -12,66 +12,103 @@ from typing import Any
 load_dotenv()
 banking = Blueprint('banking', __name__)
 KEY = os.getenv("ENCREPTION_KEY")
-# Function to check if user is logged in
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("user_id"):
-            return redirect(url_for("auth.login"))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 # home page for everyone
-@banking.route('/')
-def index():
-    if session.get("user_id"):
-        return redirect(url_for("banking.home"))
-    return render_template("index.html")
+@banking.route('/', methods=['GET'])
+def documentation():
+    doc = {
+        "message": "Welcome to the app! Please follow these steps to get started.",
+        "steps": [
+            {
+                "step": 1,
+                "description": "Go to /auth/login to log in to your account."
+            },
+            {
+                "step": 2,
+                "description": "After logging in, you will receive a token for authentication."
+            },
+            {
+                "step": 3,
+                "description": "Use the token for subsequent requests by including it in the Authorization header."
+            },
+            {
+                "step": 4,
+                "description": "For registration, go to /auth/register."
+            },
+            {
+                "step": 5,
+                "description": "For password reset, use /auth/forgot_password to receive a reset link."
+            }
+        ],
+        "note": "Ensure to have all the required fields when registering or resetting your password."
+    }
+    return jsonify(json.dumps(doc, indent=4)), 200
 
 # home page for loged in users that will show data 
 @banking.route('/dashboard', methods=['GET'])
-@login_required
+@jwt_required()
 def home():
-    user_data = load_data(session["username"])
-    name = user_data.get("name")
-    balance = user_data.get("balance")
-    transactions = user_data.get("transactions", [])
-    return render_template("home.html", balance=balance, transactions=transactions, username=session["username"], name=name)
+    encripted_data=load_data(get_jwt_identity())
+    user_data = decrypt_user_data(encripted_data, key=KEY)
+    if not user_data:
+        return jsonify({"error": "User data not found."}), 404
+    return jsonify(user_data), 200
 
 @banking.route('/history', methods=['GET', 'POST'])
-@login_required 
+@jwt_required() 
 def transactions():
-    enc_data: dict[str, Any] = load_data(session["username"])
+    enc_data: dict[str, Any] = load_data(get_jwt_identity())
     user_data: dict = decrypt_user_data(enc_data, key=KEY)
     transactions = user_data.get("transactions", [])
     if not transactions :
-        return render_template("history.html", transactions=transactions, message="No transactions found")
-    return render_template("history.html", transactions=transactions, username=session["username"], name=user_data["name"])
+        return jsonify(transactions=transactions, message="No transactions found")
+    return jsonify(
+        transactions=transactions, 
+        balance=user_data["balance"], 
+        username=user_data["username"], 
+        message="Transactions retrieved successfully", 
+        first_name=user_data["first_name"]
+        ), 200
     
 
 @banking.route("/transfer", methods=["POST"])
 def transfer():
-    if not session.get("user_id"):
-        return redirect(url_for("auth.login"))
 
     recipient = request.form.get("recipient")
     message = request.form.get("message")
+    encrypted_data = load_data(get_jwt_identity())
+    user_data =decrypt_user_data(encrypted_data, key=KEY)
+
     try:
         amount = float(request.form.get("amount", 0))
     except ValueError:
-        return render_template("home.html", error="Invalid amount entered.", show_modal=True, username=session["username"], balance=load_data(session["username"])["balance"])
+        return jsonify(
+            error="Invalid amount entered.", 
+            username=get_jwt_identity(), 
+            balance=user_data["balance"]
+            ), 400
 
-    sender_username = session["username"]
+    sender_username = user_data["username"]
 
     if not user_exists(recipient):
-        return render_template("home.html", error="Recipient does not exist.", show_modal=True, username=sender_username, balance=load_data(sender_username)["balance"])
+        return jsonify( 
+            error="Recipient does not exist.", 
+            username=sender_username, 
+            balance=user_data["balance"]
+            ), 404
 
-    sender_data = load_data(sender_username)
-    recipient_data = load_data(recipient)
+    sender_data_en = load_data(sender_username)
+    recipient_data_en = load_data(recipient)
+    sender_data = decrypt_user_data(sender_data_en, key=KEY)
+    recipient_data = decrypt_user_data(recipient_data_en, key=KEY)
 
     if sender_data["balance"] < amount:
-        return render_template("home.html", error="Insufficient funds.", show_modal=True, username=sender_username, balance=sender_data["balance"])
+        return jsonify( 
+            error="Insufficient funds.",  
+            username=sender_username, 
+            balance=sender_data["balance"]
+            ), 400
 
     # Perform transfer
     sender_data["balance"] -= amount
@@ -103,23 +140,102 @@ def transfer():
     save_data(recipient_data, recipient)
 
     logger.Info_logger.info(f"{sender_username} transferred {amount} to {recipient} at {now}")
-    return render_template("home.html", success="Transfer completed successfully.", show_modal=True, username=sender_username, balance=sender_data["balance"])
-
+    return jsonify( 
+        success="Transfer completed successfully.", 
+        username=sender_username, 
+        balance=sender_data["balance"]
+        ), 200
 @banking.route('/pay_bills', methods=['GET', 'POST'])
-@login_required 
+@jwt_required() 
 def bills():
     bills_category = ["Electricity", "Water", "Internet", "Gas", "Phone", "Insurance", "Rent", "Other"]
+
+    # For GET requests, return available bill categories
+    if request.method == 'GET':
+        return jsonify({"bills_category": bills_category}), 200
+
+    # For POST requests, process bill payment
     if request.method == 'POST':
-        pass
-    return jsonify(bills_category)
+        bill_type = request.form.get("bill_type")
+        amount = request.form.get("amount")
+        
+        if bill_type not in bills_category:
+            return jsonify({"error": "Invalid bill category."}), 400
 
-@banking.route('/settings', methods=['GET', 'POST'])
-@login_required 
+        try:
+            amount = float(amount)
+        except ValueError:
+            return jsonify({"error": "Invalid amount."}), 400
+
+        encrypted_data = load_data(get_jwt_identity())
+        user_data = decrypt_user_data(encrypted_data, key=KEY)
+
+        if user_data["balance"] < amount:
+            return jsonify({"error": "Insufficient funds."}), 400
+
+        # Record the bill payment as a transaction
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        transaction_id = str(uuid.uuid4())
+
+        user_data["balance"] -= amount
+        user_data["transactions"].append({
+            "id": transaction_id,
+            "type": "debit",
+            "amount": amount,
+            "bill_type": bill_type,
+            "date": now,
+            "message": f"Paid {bill_type} bill"
+        })
+
+        # Save updated user data
+        save_data(user_data, get_jwt_identity())
+        
+        return jsonify({"success": f"Successfully paid {bill_type} bill of {amount}.", "balance": user_data["balance"]}), 200
+
+@banking.route('/profile', methods=['GET', 'POST'])
+@jwt_required() 
 def settings():
-    return "settings page"
+    encrypted_data = load_data(get_jwt_identity())
+    user_data = decrypt_user_data(encrypted_data, key=KEY)
+
+    # For GET request, return current profile data
+    if request.method == 'GET':
+        return jsonify({
+            "username": user_data["username"],
+            "first_name": user_data["first_name"],
+            "last_name": user_data["last_name"],
+            "email": user_data["email"],
+            "phone": user_data["phone"]
+        }), 200
+
+    # For POST request, update profile data
+    if request.method == 'POST':
+        new_first_name = request.form.get("first_name")
+        new_last_name = request.form.get("last_name")
+        new_email = request.form.get("email")
+        new_phone = request.form.get("phone")
+
+        # Validate new data
+        if new_email:
+            # You can add further validation for the email here
+            user_data["email"] = new_email
+        if new_phone:
+            user_data["phone"] = new_phone
+        if new_first_name:
+            user_data["first_name"] = new_first_name
+        if new_last_name:
+            user_data["last_name"] = new_last_name
+
+        # Save updated data
+        save_data(user_data, get_jwt_identity())
+
+        return jsonify({"success": "Profile updated successfully."}), 200
 
 
-@banking.route('/accounts', methods=['GET', 'POST'])
-@login_required 
-def accounts():
-    return "accounts page"
+@banking.route('/balance', methods=['GET'])
+@jwt_required()
+def balance():
+    data = load_data(get_jwt_identity())
+    decrypted_data = decrypt_user_data(data, key=KEY)
+    balance = decrypted_data.get("balance", 0)
+    return jsonify({"balance": balance}), 200
