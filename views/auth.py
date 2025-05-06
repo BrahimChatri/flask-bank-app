@@ -22,8 +22,8 @@ def login():
     request_data = request.get_json()
     username = request_data.get('username')
     password = request_data.get('password')
-    expires = request_data.get('remember_me', False)
-    expires_delta = timedelta(days=15) if expires else timedelta(minutes=30)
+    expires = request_data.get('rememberMe', False)
+    expires_delta = timedelta(days=15) if expires  else timedelta(minutes=30)
     if not username :
         return jsonify({"error": "Username required"}), 400
     elif not password:
@@ -38,7 +38,7 @@ def login():
                 encripted_data["token"]= encrypt_data(access_token, key=KEY)
                 logger.Info_logger.info(f"User {username} has logged in")
                 save_data(encripted_data, username)
-                return jsonify(access_token=access_token), 200
+                return jsonify(token=access_token), 200
 
             else:
                 return jsonify({"error": "Invalid password"}), 401
@@ -46,6 +46,7 @@ def login():
         return jsonify({"error": "Username and password are required"}), 400
 
 @auth.route('/logout', methods=['POST'])
+@jwt_required()
 def logout():
     jti = get_jwt()["jti"]
     BLACKLIST.add(jti)
@@ -125,6 +126,7 @@ def register():
     #     "transactions": user_data.get("transactions", []),
     #     "token": None,
     # }
+    print(new_data)
     save_data(new_data, username)
     logger.Info_logger.info(f"User {username} has registered successfully at {formatted_date}")
     return jsonify({"message": "User registered successfully", "redirict": url_for("auth.login")}), 201

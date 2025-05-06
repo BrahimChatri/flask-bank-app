@@ -8,24 +8,25 @@ The goal of this project is to learn and implement core backend concepts like au
 ## 🚀 Features
 
 - User Registration & Login
-- Session-based Authentication
+- JWT-based Authentication
 - Deposit & Withdraw Funds
 - Transfer Between Users
 - View Transaction History
 - File-based Data Storage (JSON or similar)
 - Modular Code Structure with Blueprints
-- Simple and Clean HTML Templates
+- Futur react app for front-end
 
 ---
 
 ## 📁 Project Structure
 
 ```
-|-- bank_app
+|-- flask-bank-app
     |-- .env
     |-- .gitignore
     |-- app.py
     |-- config.py
+    |-- directoryList.md
     |-- LICENSE
     |-- logs.log
     |-- README.md
@@ -33,22 +34,20 @@ The goal of this project is to learn and implement core backend concepts like au
     |-- test.py
     |-- data
     |   |-- admin.json
-    |   |-- brahim_ch.json
-    |   |-- hafsa.json
-    |   |-- testuser.json
-    |
+    |   |-- brahim.json
     |-- utils
     |   |-- authmanager.py
     |   |-- logger.py
     |   |-- storage.py
     |   |-- __init__.py
-    |
+    |  
     |-- views
     |   |-- admin.py
     |   |-- auth.py
     |   |-- banking.py
     |   |-- __init__.py
-    
+
+
 ```
 
 ---

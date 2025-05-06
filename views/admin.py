@@ -14,11 +14,21 @@ KEY = os.getenv("ENCREPTION_KEY")
 # Helper function to check if the logged-in user is an admin
 def is_admin():
     current_user = get_jwt_identity()
-    user_data_encrypted = load_data(current_user + '.json')
+    user_data_encrypted = load_data(current_user)
     user_data = decrypt_user_data(user_data_encrypted, key=KEY)
-    
+
     # Check if the user has 'is_admin' key and if it is True
     return user_data.get('is_admin', False)
+
+# def admin_required(fn):
+#     @wraps(fn)
+#     @jwt_required()
+#     def wrapper(*args, **kwargs):
+#         data = decrypt_user_data(load_data(get_jwt_identity()), key=KEY)
+#         if not data.get("is_admin"):
+#             return jsonify({"error": "Admin access required"}), 403
+#         return fn(*args, **kwargs)
+#     return wrapper
 
 # Admin homepage
 @admin.route('/', methods=['GET'])
@@ -38,7 +48,9 @@ def view_users():
     users_data = []
     for filename in os.listdir('data'):
         if filename.endswith('.json'):
-            user_data_encrypted = load_data(filename)
+            # Remove the '.json' extension before passing to load_data
+            base_filename = filename[:-5]  # Strip the last 5 characters (".json")
+            user_data_encrypted = load_data(base_filename)  # Pass the filename without '.json'
             user_data = decrypt_user_data(user_data_encrypted, key=KEY)
             users_data.append({
                 "username": user_data["username"],
@@ -58,7 +70,7 @@ def view_user_details(username):
 
     if not user_exists(username):
         return jsonify({"error": "User not found."}), 404
-    user_data_encrypted = load_data(username + '.json')
+    user_data_encrypted = load_data(username)
     user_data = decrypt_user_data(user_data_encrypted, key=KEY)
     return jsonify(user_data), 200
 
@@ -78,13 +90,12 @@ def update_balance(username):
     except ValueError:
         return jsonify({"error": "Invalid balance value."}), 400
 
-    user_data = load_data(username + '.json')
+    user_data = load_data(username)
     user_data["balance"] = new_balance
-    save_data(user_data, username + '.json')
+    save_data(user_data, username )
     
     return jsonify({"message": "Balance updated successfully.", "new_balance": new_balance}), 200
 
-# View all transactions
 @admin.route('/transactions', methods=['GET'])
 @jwt_required()
 def view_transactions():
@@ -94,8 +105,10 @@ def view_transactions():
     transactions = []
     for filename in os.listdir('data'):
         if filename.endswith('.json'):
-            user_data_encrypted = load_data(filename)
-            user_data = decrypt_user_data(user_data_encrypted)
+            # Remove the '.json' extension before passing to load_data
+            base_filename = filename[:-5]  # Strip the last 5 characters (".json")
+            user_data_encrypted = load_data(base_filename)  # Pass the filename without '.json'
+            user_data = decrypt_user_data(user_data_encrypted, key=KEY)
             transactions.extend(user_data.get("transactions", []))
     
     return jsonify(transactions), 200

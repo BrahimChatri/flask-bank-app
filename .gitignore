@@ -9,3 +9,4 @@ data/
 *.log
 Caddyfile
 directoryList.md
+test.py

@@ -1,10 +1,9 @@
-from flask import (request, Blueprint, redirect, render_template, url_for, jsonify)
+from flask import request, Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from utils.storage import load_data, save_data
 import utils.logger as logger
-import json, os, uuid
+import os, uuid
 from utils.authmanager import *
-from functools import wraps
 from datetime import datetime
 from dotenv import load_dotenv
 from typing import Any
@@ -43,7 +42,7 @@ def documentation():
         ],
         "note": "Ensure to have all the required fields when registering or resetting your password."
     }
-    return jsonify(json.dumps(doc, indent=4)), 200
+    return jsonify(doc), 200
 
 # home page for loged in users that will show data 
 @banking.route('/dashboard', methods=['GET'])
@@ -51,11 +50,17 @@ def documentation():
 def home():
     encripted_data=load_data(get_jwt_identity())
     user_data = decrypt_user_data(encripted_data, key=KEY)
+    api_data = user_data.copy()
+    api_data.pop("password_hash", None)  # Remove sensitive data
+    api_data.pop("user_id", None)
+    api_data.pop("token", None)
+    api_data.pop("phone_number", None)
+
     if not user_data:
         return jsonify({"error": "User data not found."}), 404
-    return jsonify(user_data), 200
+    return jsonify(api_data), 200
 
-@banking.route('/history', methods=['GET', 'POST'])
+@banking.route('/transactions', methods=['GET', 'POST'])
 @jwt_required() 
 def transactions():
     enc_data: dict[str, Any] = load_data(get_jwt_identity())
@@ -73,15 +78,16 @@ def transactions():
     
 
 @banking.route("/transfer", methods=["POST"])
+@jwt_required()
 def transfer():
-
-    recipient = request.form.get("recipient")
-    message = request.form.get("message")
+    data = request.get_json()
+    recipient = data.get("recipient")
+    message = data.get("message")
     encrypted_data = load_data(get_jwt_identity())
     user_data =decrypt_user_data(encrypted_data, key=KEY)
 
     try:
-        amount = float(request.form.get("amount", 0))
+        amount = float(data.get("amount", 0))
     except ValueError:
         return jsonify(
             error="Invalid amount entered.", 
@@ -98,10 +104,8 @@ def transfer():
             balance=user_data["balance"]
             ), 404
 
-    sender_data_en = load_data(sender_username)
-    recipient_data_en = load_data(recipient)
-    sender_data = decrypt_user_data(sender_data_en, key=KEY)
-    recipient_data = decrypt_user_data(recipient_data_en, key=KEY)
+    sender_data = load_data(sender_username)
+    recipient_data = load_data(recipient)
 
     if sender_data["balance"] < amount:
         return jsonify( 
@@ -145,6 +149,8 @@ def transfer():
         username=sender_username, 
         balance=sender_data["balance"]
         ), 200
+
+
 @banking.route('/pay_bills', methods=['GET', 'POST'])
 @jwt_required() 
 def bills():
@@ -167,8 +173,7 @@ def bills():
         except ValueError:
             return jsonify({"error": "Invalid amount."}), 400
 
-        encrypted_data = load_data(get_jwt_identity())
-        user_data = decrypt_user_data(encrypted_data, key=KEY)
+        user_data =  load_data(get_jwt_identity())
 
         if user_data["balance"] < amount:
             return jsonify({"error": "Insufficient funds."}), 400
@@ -195,8 +200,7 @@ def bills():
 @banking.route('/profile', methods=['GET', 'POST'])
 @jwt_required() 
 def settings():
-    encrypted_data = load_data(get_jwt_identity())
-    user_data = decrypt_user_data(encrypted_data, key=KEY)
+    user_data = load_data(get_jwt_identity())
 
     # For GET request, return current profile data
     if request.method == 'GET':
@@ -218,13 +222,13 @@ def settings():
         # Validate new data
         if new_email:
             # You can add further validation for the email here
-            user_data["email"] = new_email
+            user_data["email"] = decrypt_data(new_email, key=KEY)
         if new_phone:
-            user_data["phone"] = new_phone
+            user_data["phone"] = decrypt_data(new_phone)
         if new_first_name:
-            user_data["first_name"] = new_first_name
+            user_data["first_name"] = decrypt_data(new_first_name, key=KEY)
         if new_last_name:
-            user_data["last_name"] = new_last_name
+            user_data["last_name"] = decrypt_data(new_last_name, key=KEY)
 
         # Save updated data
         save_data(user_data, get_jwt_identity())
